@@ -8,4 +8,4 @@
 - Q3 Support HTTP
 
 # Architecture
-[!avatar](ISP.jpeg)
+![avatar](ISP.jpeg)
