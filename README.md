@@ -4,7 +4,7 @@
 - One step store, two steps get
 
 # Description
-### Pain points for isps:
+### Pain points for ICSP:
 
 * Currently a Canister only has a limited amount of storage space, and when the storage space is full, the Canister needs to have the ability to automatically create new storage space. There is currently no such infrastructure to help developers do this.
 
@@ -12,7 +12,7 @@
 
 * There is currently no best practice for using both Stable memory and runtime memory, and the ISP offers a data analysis and real world test case.
 
-### Technical features of isps:
+### Technical features of ICSP:
 1. Infinite capacity, read and write to the same Canister without having to worry about storage space.
    * Explanation: 
      * infinite capacity refers to the infinite creation of the Canister contract (in the case of a sufficient Cycle) , which supports the automatic creation of the Canister when the storage Canister is full and does not block the creation of data writes, smooth and smooth switching of storage destination.
@@ -29,7 +29,7 @@
    * Explanation: 
      * ISP Heartbeat actively triggers the monitoring of ISP and storage monomer Cycle balances and automatically Top Up, so the user only needs to monitor the ISP's ICP balances.
 
-### Advantages of isps:
+### Advantages of ICSP:
 * Data acqtion speed, IC storage base for RAM (memory) storage, from the acqtion of data efficiency, will be faster than the ROM (hard disk)-based storage base.
 
 * Support for HTTP and Certificated Data, that is, direct access to consensus and signed Data via HTTP, or direct access to Data on nodes via HTTP (faster, status equivalent to that of a centralized server node)
