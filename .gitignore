@@ -1,2 +1,4 @@
 canister_ids.json
 .dfx
+.DS_Store
+.idea
