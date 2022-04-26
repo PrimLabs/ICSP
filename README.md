@@ -63,4 +63,4 @@
 ```
 
 # Architecture
-![avatar](ISP.jpeg)
+![avatar](ICSP.jpeg)
