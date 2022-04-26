@@ -1,18 +1,17 @@
-# Internet Computer Storage Protocol(ICSP)
+# **Internet Computer Storage Protocol**(**ICSP**)
 - Autoscaling Storage
 - Self Cycle Monitor
 - One step store, two steps get
 
 # Description
 ### Pain points for isps:
-* 
-* 1. Currently a Canister only has a limited amount of storage space, and when the storage space is full, the Canister needs to have the ability to automatically create new storage space. There is currently no such infrastructure to help developers do this.
-* 
-* 2. At present, the memory of Canister is divided into Stable memory and run-time memory. The use of run-time memory is related to the upgrade ability of Canister. When the run-time memory of Canister is large, the Canister can not be upgraded, this results in a reduced performance of Canister services and a failure to provide a better quality of service.
-* 
-* 2. There is currently no best practice for using both Stable memory and runtime memory, and the ISP offers a data analysis and real world test case.
-* 
-* 
+
+* Currently a Canister only has a limited amount of storage space, and when the storage space is full, the Canister needs to have the ability to automatically create new storage space. There is currently no such infrastructure to help developers do this.
+
+* At present, the memory of Canister is divided into Stable memory and run-time memory. The use of run-time memory is related to the upgrade ability of Canister. When the run-time memory of Canister is large, the Canister can not be upgraded, this results in a reduced performance of Canister services and a failure to provide a better quality of service.
+
+* There is currently no best practice for using both Stable memory and runtime memory, and the ISP offers a data analysis and real world test case.
+
 ### Technical features of isps:
 1. Infinite capacity, read and write to the same Canister without having to worry about storage space.
    * Explanation: 
