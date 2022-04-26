@@ -1,4 +1,4 @@
-# Internet Computer Storage Protocol(ISP)
+# Internet Computer Storage Protocol(ICSP)
 - Autoscaling Storage
 - Self Cycle Monitor
 - One step store, two steps get
