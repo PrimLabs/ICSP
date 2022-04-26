@@ -1,7 +1,7 @@
 {
     "canisters": {
       "ISP":{
-        "main":"v1/ISP.mo",
+        "main":"v1/ICSP.mo",
         "type":"motoko"
       }
     },
