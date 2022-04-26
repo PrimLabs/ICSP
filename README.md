@@ -42,7 +42,7 @@
 - Q3 Support HTTP Request and Response, Certificated Header
 
 # Service Interface
-## ISP Canister
+## ICSP Canister
 
 ```motoko
     // get storage bucket from key
