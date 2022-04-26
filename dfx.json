@@ -1,0 +1,22 @@
+{
+    "canisters": {
+      "ISP":{
+        "main":"v1/ISP.mo",
+        "type":"motoko"
+      }
+    },
+    "defaults": {
+      "build": {
+        "args": "--max-stable-pages=131072",
+        "packtool": ""
+      }
+    },
+    "dfx": "0.9.3",
+    "networks": {
+      "local": {
+        "bind": "127.0.0.1:8000",
+        "type": "ephemeral"
+      }
+    },
+    "version": 1
+  }
