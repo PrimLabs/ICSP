@@ -160,7 +160,7 @@ shared(installer) actor class isp()  = this {
         for(b in buckets.keys()){
             if(b == p) return true
         };
-        (Principal.fromActor(liveBucket.bucket) == p) or false
+        Principal.fromActor(liveBucket.bucket) == p
     };
 
     system func preupgrade(){
