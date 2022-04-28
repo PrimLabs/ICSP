@@ -67,10 +67,13 @@ shared(installer) actor class isp()  = this {
         )
     };
 
-    public shared({caller}) func store(args : StoreArgs) : async (){
+    public shared({caller}) func init() : async (){
         if(Principal.fromActor(liveBucket.bucket) == Principal.fromText("aaaaa-aa")){
             await createNewBucket()
         };
+    };
+
+    public shared({caller}) func store(args : StoreArgs) : async (){
         ignore await liveBucket.bucket.store(args);
         if(_changeLiveBucketState(args.key, args.value.size()) and (not liveBucket.retiring)){
             liveBucket.retiring := true;
