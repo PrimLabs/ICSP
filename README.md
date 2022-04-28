@@ -62,5 +62,12 @@
     store : shared(args : StoreArgs) -> async ();
 ```
 
+# Usage 
+1. Deploy the ICSP Canister
+2. call iscp init()
+```shell
+    dfx canister call icsp init
+```
+
 # Architecture
 ![avatar](ICSP.jpeg)
