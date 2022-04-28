@@ -67,9 +67,12 @@ shared(installer) actor class isp()  = this {
         )
     };
 
-    public shared({caller}) func init() : async (){
+    public shared({caller}) func init() : async Text{
         if(Principal.fromActor(liveBucket.bucket) == Principal.fromText("aaaaa-aa")){
             await createNewBucket()
+            "success"
+        }else{
+            "failed"
         };
     };
 
@@ -85,7 +88,7 @@ shared(installer) actor class isp()  = this {
         if (caller != Principal.fromActor(this) or caller != ADMIN) return;
         Cycles.add(CYCLE_SHARE);
         let nb = await Bucket.Bucket();
-        liveBucket.bucket := nb : BucketInterface;
+        liveBucket.bucket : BucketInterface := actor(debug_show(Principal.fromActor(nb)));
         liveBucket.used_memory := 0;
         liveBucket.retiring := false;
     };
