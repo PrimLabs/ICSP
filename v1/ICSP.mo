@@ -10,6 +10,7 @@ import Text "mo:base/Text";
 import Hash "mo:base/Hash";
 import Blob "mo:base/Blob";
 import Bucket "Bucket";
+import HttpHandler "Lib/HttpHandler";
 import A "Lib/Account";
 import U "Lib/Utils";
 
@@ -50,9 +51,6 @@ shared(installer) actor class isp()  = this {
         return #err(())
     };
 
-    // TODO : Http Handle
-    // public query func http_request(req : HttpRequest) : async HttpResponse{};
-
     public query({caller}) func getBuckets() : async (LiveBucketExt, [Principal]){
         assert(caller == ADMIN);
         let res = Array.init<Principal>(buckets.size(), Principal.fromActor(this));
@@ -69,6 +67,18 @@ shared(installer) actor class isp()  = this {
             },
             Array.freeze<Principal>(res)
         )
+    };
+
+    public query func http_request(request : HttpRequest) : async HttpResponse{
+        let path = Iter.toArray(Text.tokens(request.url, #text("/")));
+        if (path.size() == 1) {
+            for((p, keys) in buckets.entries()){
+                if(TrieSet.mem<Text>(keys, path[0], Text.hash(path[0]), Text.equal)){
+                    return build_302(Principal.toText(p), path[0]);
+                }
+            };
+        };
+        errStaticPage()
     };
 
     public shared({caller}) func init() : async Text{
@@ -154,6 +164,15 @@ shared(installer) actor class isp()  = this {
         Cycles.accept(Cycles.available())
     };
 
+    private func errStaticPage(): HttpResponse {
+        {
+            status_code = 404;
+            headers = [("Content-Type", "text/plain; version=0.0.4")];
+            body = Text.encodeUtf8("Someting Wrong!");
+            streaming_strategy = null;
+        }
+    };
+
     // true : need to create new bucket
     private func _changeLiveBucketState(key : Text, data_size : Nat) : Bool{
         let canister_id = Principal.fromActor(liveBucket.bucket);
@@ -176,7 +195,7 @@ shared(installer) actor class isp()  = this {
         Principal.fromActor(liveBucket.bucket) == p
     };
 
-    func build_302(bucket_id : Text, key : Text) : HttpResponse{
+    private func build_302(bucket_id : Text, key : Text) : HttpResponse{
         {
             status_code = 302;
             headers = [
@@ -185,8 +204,8 @@ shared(installer) actor class isp()  = this {
                 ("Location", bucket_id # ".raw.ic0.app/" # key),
                 ("Cache-Control", "max-age=3000") // 5 min
             ];
-            body = Text.encodeUtf8("<html lang="#"en"#"><head><title>LinkMe</title></head><body></body></html>");
-            streaming_strategy = null
+            body = Text.encodeUtf8("<html lang="#"en"#"><head><title>ICSP</title></head><body></body></html>");
+            streaming_strategy = null;
         }
     };
 

@@ -8,33 +8,52 @@ import Principal "mo:base/Principal";
 import TrieMap "mo:base/TrieMap";
 import Cycles "mo:base/ExperimentalCycles";
 import SM "mo:base/ExperimentalStableMemory";
+import HttpHandler "Lib/HttpHandler";
 
 shared(installer) actor class Bucket() = this{
     private type StoreArgs              = Types.StoreArgs;
     private type IspInterface           = Types.IspInterface;
+    private type HttpRequest            = HttpHandler.HttpRequest;
+    private type HttpResponse           = HttpHandler.HttpResponse;
     private let CYCLE_THRESHOLD         = 3_000_000_000_000;
     private let ISP : IspInterface      = actor (Principal.toText(installer.caller));
     private stable var offset           = 0;
-    private stable var assets_entries : [var (Text, (Nat64, Nat))] = [var];
-    private var assets : TrieMap.TrieMap<Text, (Nat64, Nat)> = TrieMap.fromEntries<Text, (Nat64, Nat)>(assets_entries.vals(), Text.equal, Text.hash);
+    private stable var assets_entries : [var (Text, (Nat64, Nat, Text))] = [var];
+    private var assets : TrieMap.TrieMap<Text, (Nat64, Nat, Text)> = TrieMap.fromEntries<Text, (Nat64, Nat, Text)>(assets_entries.vals(), Text.equal, Text.hash);
     
-    public query({caller}) func get(key : Text) : async Result.Result<Blob, ()> {
+    public query({caller}) func get(key : Text) : async Result.Result<(Blob, Text), ()> {
         switch(assets.get(key)) {
             case(null) { 
                 #err(())
             };
             case(?field) {
-                #ok(_loadFromSM(field.0, field.1))
+                #ok(_loadFromSM(field.0, field.1), field.2)
             };
         }
     };
 
     // build 200
-    // public query func http_request(req : HttpRequest) : async HttpResponse{};
+    public query func http_request(request : HttpRequest) : async HttpResponse{
+        let path = Iter.toArray(Text.tokens(request.url, #text("/")));
+        if (path.size() == 1) {
+            switch(_get(path[0])) { 
+                case(#err(_err)) return errStaticPage();
+                case(#ok(payload)) {
+                    return {
+                        status_code = 200;
+                        headers = [("Content-Type", payload.1)];
+                        body = payload.0;
+                        streaming_strategy = null;
+                    };
+                }
+            }
+        };
+        errStaticPage()
+    };
 
     public shared({caller}) func store(args : StoreArgs) : async (){
         assert(caller == Principal.fromActor(ISP));
-        let _field = _getField(args.value.size());
+        let _field = _getField(args.value.size(), args.file_type);
         assets.put(args.key, _field);
         _storageData(_field.0, args.value);
     };
@@ -48,6 +67,26 @@ shared(installer) actor class Bucket() = this{
         };
     };
 
+    private func errStaticPage(): HttpResponse {
+        {
+            status_code = 404;
+            headers = [("Content-Type", "text/plain; version=0.0.4")];
+            body = Text.encodeUtf8("Someting Wrong!");
+            streaming_strategy = null;
+        }
+    };
+
+    private func _get(key : Text) : Result.Result<(Blob, Text), ()> {
+        switch(assets.get(key)) {
+            case(null) { 
+                #err(())
+            };
+            case(?field) {
+                #ok(_loadFromSM(field.0, field.1), field.2)
+            };
+        }
+    };
+
     private func _loadFromSM(_offset : Nat64, length : Nat) : Blob {
         SM.loadBlob(_offset, length)
     };
@@ -56,8 +95,8 @@ shared(installer) actor class Bucket() = this{
         SM.storeBlob(_offset, data)
     };
 
-    private func _getField(total_size : Nat) : (Nat64, Nat) {
-        let field = (Nat64.fromNat(offset), total_size);
+    private func _getField(total_size : Nat, file_type : Text) : (Nat64, Nat, Text) {
+        let field = (Nat64.fromNat(offset), total_size, file_type);
         _growStableMemoryPage(total_size);
         offset += total_size;
         field
@@ -78,7 +117,7 @@ shared(installer) actor class Bucket() = this{
     };
 
     system func preupgrade() {
-        assets_entries := Array.init<(Text, (Nat64, Nat))>(assets.size(), ("", (0, 0)));
+        assets_entries := Array.init<(Text, (Nat64, Nat, Text))>(assets.size(), ("", (0, 0, "")));
         var assets_index = 0;
         for (a in assets.entries()) {
             assets_entries[assets_index] := a;

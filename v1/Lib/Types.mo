@@ -6,6 +6,7 @@ module {
     public type StoreArgs = {
         key : Text;
         value : Blob;
+        file_type : Text;
     };
 
     public type BucketInterface = actor{
