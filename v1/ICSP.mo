@@ -99,10 +99,11 @@ shared(installer) actor class isp()  = this {
         if(_inspectCycleBalance()){
             // insufficient cycle
             // ignore topUpSelf : 2 T : icp -> cycle 2 T
+            ignore topUp(2_000_000_000_000);
         };
 
         // 确定一定能创建新的 bucket : cycle balance >= isp cycle threshold + bucket creation cost [1]
-        if(_changeLiveBucketState(args.key, args.value.size()) and (not liveBucket.retiring)){
+        if(_changeLiveBucketState(args.key, args.value.size()) and (not liveBucket.retiring) and _inspectCycleBalance(CYCLE_THRESHOLD + CYCLE_SHARE)){
             liveBucket.retiring := true;
             ignore createNewBucket();
         };
@@ -128,7 +129,7 @@ shared(installer) actor class isp()  = this {
             fee = { e8s = 10_000 };
             memo = TOP_UP_CANISTER_MEMO;
             from_subaccount = ?default;
-            amount = { e8s = 10_000_000 }; // 0.1 icp
+            amount = { e8s = amount }; // amount icp
             created_at_time = null;
         })){
             case(#Ok(block_height)){
@@ -173,6 +174,11 @@ shared(installer) actor class isp()  = this {
             body = Text.encodeUtf8("Someting Wrong!");
             streaming_strategy = null;
         }
+    };
+
+    private func _inspectCycleBalance(necessary_cycle : Nat) : Bool{
+        if (Cycles.balance() >= necessary_cycle) {return true;} 
+        else {return false;} 
     };
 
     // true : need to create new bucket
@@ -227,30 +233,29 @@ shared(installer) actor class isp()  = this {
         buckets_entries := [var];
     };
 
-    var buckets_heartbeat_interval = 0;
-    var isp_heartbeat_interval = 0;
+    // var buckets_heartbeat_interval = 0;
+    // var isp_heartbeat_interval = 0;
 
-    system func heartbeat() : async (){
-        if(isp_heartbeat_interval == 10){
-            let ISP_DYNAMIC_THRE : Nat = buckets.size() * CYCLE_BUCKET_LEFT + CYCLE_THRESHOLD;
-            if (Cycles.balance() < ISP_DYNAMIC_THRE) {
-                let amount : Nat = ISP_DYNAMIC_THRE - Cycles.balance();
-                ignore await topUp(amount);
-            };
-            isp_heartbeat_interval := 0;
-        }else{
-            isp_heartbeat_interval += 1;
-        };
-         // 60 block, check the buckets
-         if(buckets_heartbeat_interval == 60){
-            for(m in buckets.keys()){
-                let bucket : BucketInterface = actor(Principal.toText(m));
-                await bucket.monitor();
-            };
-            buckets_heartbeat_interval := 0;
-         }else{
-            buckets_heartbeat_interval += 1;
-         }
-    };
-
+    // system func heartbeat() : async (){
+    //     if(isp_heartbeat_interval == 10){
+    //         let ISP_DYNAMIC_THRE : Nat = buckets.size() * CYCLE_BUCKET_LEFT + CYCLE_THRESHOLD;
+    //         if (Cycles.balance() < ISP_DYNAMIC_THRE) {
+    //             let amount : Nat = ISP_DYNAMIC_THRE - Cycles.balance();
+    //             ignore await topUp(amount);
+    //         };
+    //         isp_heartbeat_interval := 0;
+    //     }else{
+    //         isp_heartbeat_interval += 1;
+    //     };
+    //      // 60 block, check the buckets
+    //      if(buckets_heartbeat_interval == 60){
+    //         for(m in buckets.keys()){
+    //             let bucket : BucketInterface = actor(Principal.toText(m));
+    //             await bucket.monitor();
+    //         };
+    //         buckets_heartbeat_interval := 0;
+    //      }else{
+    //         buckets_heartbeat_interval += 1;
+    //      }
+    // };
 };
