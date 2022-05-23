@@ -29,6 +29,9 @@ shared(installer) actor class Bucket() = this{
         }
     };
 
+    // build 200
+    // public query func http_request(req : HttpRequest) : async HttpResponse{};
+
     public shared({caller}) func store(args : StoreArgs) : async (){
         assert(caller == Principal.fromActor(ISP));
         let _field = _getField(args.value.size());

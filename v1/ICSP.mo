@@ -40,6 +40,7 @@ shared(installer) actor class isp()  = this {
         var retiring = false;
     };
 
+    // TODO : support http redirect get [3]
     public query({caller}) func get(key : Text) : async Result.Result<Principal, ()>{
         for((p, keys) in buckets.entries()){
             if(TrieSet.mem<Text>(keys, key, Text.hash(key), Text.equal)){
@@ -48,6 +49,9 @@ shared(installer) actor class isp()  = this {
         };
         return #err(())
     };
+
+    // TODO : Http Handle
+    // public query func http_request(req : HttpRequest) : async HttpResponse{};
 
     public query({caller}) func getBuckets() : async (LiveBucketExt, [Principal]){
         assert(caller == ADMIN);
@@ -77,13 +81,22 @@ shared(installer) actor class isp()  = this {
     };
 
     public shared({caller}) func store(args : StoreArgs) : async (){
-        ignore await liveBucket.bucket.store(args);
+        ignore liveBucket.bucket.store(args);
+
+        // inspect cycle balance [2]
+        if(_inspectCycleBalance()){
+            // insufficient cycle
+            // ignore topUpSelf : 2 T : icp -> cycle 2 T
+        };
+
+        // 确定一定能创建新的 bucket : cycle balance >= isp cycle threshold + bucket creation cost [1]
         if(_changeLiveBucketState(args.key, args.value.size()) and (not liveBucket.retiring)){
             liveBucket.retiring := true;
-            ignore await createNewBucket();
+            ignore createNewBucket();
         };
     };
 
+    // inspect cycle balance [1]
     public shared({caller}) func createNewBucket() : async (){
         if (caller != Principal.fromActor(this) and caller != ADMIN) return;
         Cycles.add(CYCLE_SHARE);
@@ -161,6 +174,20 @@ shared(installer) actor class isp()  = this {
             if(b == p) return true
         };
         Principal.fromActor(liveBucket.bucket) == p
+    };
+
+    func build_302(bucket_id : Text, key : Text) : HttpResponse{
+        {
+            status_code = 302;
+            headers = [
+                ("Content-Type", "text/html"),
+                ("Accept-Charset","utf8"),
+                ("Location", bucket_id # ".raw.ic0.app/" # key),
+                ("Cache-Control", "max-age=3000") // 5 min
+            ];
+            body = Text.encodeUtf8("<html lang="#"en"#"><head><title>LinkMe</title></head><body></body></html>");
+            streaming_strategy = null
+        }
     };
 
     system func preupgrade(){

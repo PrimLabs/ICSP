@@ -2,6 +2,7 @@ import Result "mo:base/Result";
 
 module {
 
+    // file type : jpeg , jpg : Text
     public type StoreArgs = {
         key : Text;
         value : Blob;
