@@ -10,6 +10,7 @@ import Text "mo:base/Text";
 import Hash "mo:base/Hash";
 import Blob "mo:base/Blob";
 import Bucket "Bucket";
+import Nat64 "mo:base/Nat64";
 import HttpHandler "Lib/HttpHandler";
 import A "Lib/Account";
 import U "Lib/Utils";
@@ -96,7 +97,7 @@ shared(installer) actor class isp()  = this {
         ignore liveBucket.bucket.store(args);
 
         // inspect cycle balance [2]
-        if(_inspectCycleBalance()){
+        if(_inspectCycleBalance(CYCLE_BUCKET_LEFT)){
             // insufficient cycle
             // ignore topUpSelf : 2 T : icp -> cycle 2 T
             ignore topUp(2_000_000_000_000);
@@ -129,7 +130,7 @@ shared(installer) actor class isp()  = this {
             fee = { e8s = 10_000 };
             memo = TOP_UP_CANISTER_MEMO;
             from_subaccount = ?default;
-            amount = { e8s = amount }; // amount icp
+            amount = { e8s = Nat64.fromNat(amount) }; // amount icp
             created_at_time = null;
         })){
             case(#Ok(block_height)){
