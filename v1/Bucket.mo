@@ -6,6 +6,7 @@ import Nat64 "mo:base/Nat64";
 import Result "mo:base/Result";
 import Principal "mo:base/Principal";
 import TrieMap "mo:base/TrieMap";
+import Iter "mo:base/Iter";
 import Cycles "mo:base/ExperimentalCycles";
 import SM "mo:base/ExperimentalStableMemory";
 import HttpHandler "Lib/HttpHandler";
