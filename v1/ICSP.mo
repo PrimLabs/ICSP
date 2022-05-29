@@ -97,10 +97,10 @@ shared(installer) actor class isp()  = this {
         ignore liveBucket.bucket.store(args);
 
         // inspect cycle balance [2]
-        if(_inspectCycleBalance(CYCLE_BUCKET_LEFT)){
+        if(_inspectCycleBalance(buckets.size() * CYCLE_BUCKET_LEFT + CYCLE_THRESHOLD)){
             // insufficient cycle
             // ignore topUpSelf : 2 T : icp -> cycle 2 T
-            ignore topUp(2_000_000_000_000);
+            ignore topUp(10_000_000); // 0.1icp
         };
 
         // 确定一定能创建新的 bucket : cycle balance >= isp cycle threshold + bucket creation cost [1]
@@ -130,7 +130,7 @@ shared(installer) actor class isp()  = this {
             fee = { e8s = 10_000 };
             memo = TOP_UP_CANISTER_MEMO;
             from_subaccount = ?default;
-            amount = { e8s = Nat64.fromNat(amount) }; // amount icp
+            amount = { e8s = 10_000_000 }; // 0.1 icp
             created_at_time = null;
         })){
             case(#Ok(block_height)){
