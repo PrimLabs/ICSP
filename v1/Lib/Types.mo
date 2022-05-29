@@ -170,4 +170,16 @@ module {
         notify_dfx : NotifyCanisterArgs -> async ();
     };
 
+    public type Time = Int;
+
+    public type CanisterStatus = {
+        cycle_balance : Nat;
+        memory_size : Nat;
+        heap_size : Nat;
+        total_allocation : Nat;
+        reclaimed : Nat;
+        max_live_size : Nat;
+        time : Time;
+        note : Text;
+    };
 };

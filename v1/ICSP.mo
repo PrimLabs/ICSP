@@ -15,6 +15,12 @@ import HttpHandler "Lib/HttpHandler";
 import A "Lib/Account";
 import U "Lib/Utils";
 
+import Nat "mo:base/Nat";
+import Int "mo:base/Int";
+import Buffer "mo:base/Buffer";
+import Time "mo:base/Time";
+import Prim "mo:⛔";
+
 shared(installer) actor class isp()  = this {
     private type StoreArgs           = Types.StoreArgs;
     private type BucketInterface     = Types.BucketInterface;
@@ -22,12 +28,13 @@ shared(installer) actor class isp()  = this {
     private type LiveBucketExt       = Types.LiveBucketExt;
     private type Management          = Types.Management;
     private type LEDGER              = Types.LEDGER;
+    private type CanisterStatus      = Types.CanisterStatus;
     private type HttpRequest         = HttpHandler.HttpRequest;
     private type HttpResponse        = HttpHandler.HttpResponse;
-    private let RETIRING_THRESHOLD   = 5905580032; // 5.5 G
-    private let CYCLE_SHARE          = 14_000_000_000_000;  // cycle share each bucket created
-    private let CYCLE_BUCKET_LEFT    = 1_000_000_000_000;
-    private let CYCLE_THRESHOLD      = 16_000_000_000_000; //  658368000000 Cycle :  2G / Month
+    private let RETIRING_THRESHOLD   = 20971520; // 20 MB
+    private let CYCLE_SHARE          =   300_000_000_000;  // cycle share each bucket created
+    private let CYCLE_BUCKET_LEFT    =   100_000_000_000;
+    private let CYCLE_THRESHOLD      = 2_000_000_000_000; //  658_368_000_000 Cycle :  2G / Month
     private let CYCLE_MINTING_CANISTER = Principal.fromText("rkp4c-7iaaa-aaaaa-aaaca-cai");
     private let Ledger : LEDGER = actor("ryjl3-tyaaa-aaaaa-aaaba-cai");
     private let TOP_UP_CANISTER_MEMO = 0x50555054 : Nat64;
@@ -43,6 +50,8 @@ shared(installer) actor class isp()  = this {
         var used_memory = 0;
         var retiring = false;
     };
+
+    private var icsp_status_record = Buffer.Buffer<CanisterStatus>(100);
 
     // TODO : support http redirect get [3]
     public query({caller}) func get(key : Text) : async Result.Result<Principal, ()>{
@@ -87,9 +96,10 @@ shared(installer) actor class isp()  = this {
     public shared({caller}) func init() : async Text{
         if(Principal.fromActor(liveBucket.bucket) == Principal.fromText("aaaaa-aa")){
             await createNewBucket();
-            "success"
+            _wirteRecord("ICSP init");
+            return "success";
         }else{
-            "failed"
+            "failed";
         };
     };
 
@@ -97,17 +107,21 @@ shared(installer) actor class isp()  = this {
         ignore liveBucket.bucket.store(args);
 
         // inspect cycle balance [2]
-        if(_inspectCycleBalance(buckets.size() * CYCLE_BUCKET_LEFT + CYCLE_THRESHOLD)){
+        if(not _inspectCycleBalance(buckets.size() * CYCLE_BUCKET_LEFT + CYCLE_THRESHOLD)){
             // insufficient cycle
             // ignore topUpSelf : 2 T : icp -> cycle 2 T
-            ignore topUp(10_000_000); // 0.1icp
+            ignore topUp(10_000_000); // 0.1 icp
+            _wirteRecord("ISCP Insufficient Cycle");
         };
 
         // 确定一定能创建新的 bucket : cycle balance >= isp cycle threshold + bucket creation cost [1]
         if(_changeLiveBucketState(args.key, args.value.size()) and (not liveBucket.retiring) and _inspectCycleBalance(CYCLE_THRESHOLD + CYCLE_SHARE)){
             liveBucket.retiring := true;
             ignore createNewBucket();
+            _wirteRecord("Create New Bucket");
         };
+
+        _wirteRecord("Store");
     };
 
     // inspect cycle balance [1]
@@ -136,11 +150,11 @@ shared(installer) actor class isp()  = this {
             case(#Ok(block_height)){
                 await Ledger.notify_dfx(
                     {
-                            to_canister = CYCLE_MINTING_CANISTER;
-                            block_height = block_height;
-                            from_subaccount = ?default;
-                            to_subaccount = ?subaccount;
-                            max_fee = { e8s = 10_000 };
+                        to_canister = CYCLE_MINTING_CANISTER;
+                        block_height = block_height;
+                        from_subaccount = ?default;
+                        to_subaccount = ?subaccount;
+                        max_fee = { e8s = 10_000 };
                     }
                 );
                 #ok("top up successfully")
@@ -160,12 +174,44 @@ shared(installer) actor class isp()  = this {
                 let management: Management = actor("aaaaa-aa");
                 Cycles.add(amount);
                 ignore await management.deposit_cycles({ canister_id = caller });
+                _wirteRecord("Top Up Bucket");
             };
         }
     };
 
     public shared func wallet_receive() : async Nat{
-        Cycles.accept(Cycles.available())
+        Cycles.accept(Cycles.available());
+    };
+
+    public shared func get_status_record() : async Text{
+        var res : Text = "";
+        for (elem in icsp_status_record.vals()) {
+            var time : Int = elem.time;
+            res := res # " cycle_balance: " # Nat.toText(elem.cycle_balance);
+            res := res # " memory_size: " # Nat.toText(elem.memory_size);
+            res := res # " heap_size: " # Nat.toText(elem.heap_size);
+            res := res # " total_allocation: " # Nat.toText(elem.total_allocation);
+            res := res # " reclaimed: " # Nat.toText(elem.reclaimed);
+            res := res # " max_live_size: " # Nat.toText(elem.max_live_size);
+            res := res # " time: " # Int.toText(time);
+            res := res # " note: " # elem.note;
+            res := res # " xxxx ";
+        };
+        return res;
+    };
+
+    private func _wirteRecord(note : Text) {
+        let record : CanisterStatus = {
+            cycle_balance = Cycles.balance();
+            memory_size = Prim.rts_memory_size();
+            heap_size = Prim.rts_heap_size();
+            total_allocation = Prim.rts_total_allocation();
+            reclaimed = Prim.rts_reclaimed();
+            max_live_size = Prim.rts_max_live_size();
+            time = Time.now();
+            note = note;
+        };
+        icsp_status_record.add(record);
     };
 
     private func errStaticPage(): HttpResponse {
