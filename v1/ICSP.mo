@@ -97,10 +97,10 @@ shared(installer) actor class isp()  = this {
         ignore liveBucket.bucket.store(args);
 
         // inspect cycle balance [2]
-        if(_inspectCycleBalance(buckets.size() * CYCLE_BUCKET_LEFT + CYCLE_THRESHOLD)){
+        if(not _inspectCycleBalance(buckets.size() * CYCLE_BUCKET_LEFT + CYCLE_THRESHOLD)){
             // insufficient cycle
             // ignore topUpSelf : 2 T : icp -> cycle 2 T
-            ignore topUp(10_000_000); // 0.1icp
+            ignore topUp(10_000_000); // 0.1 icp
         };
 
         // 确定一定能创建新的 bucket : cycle balance >= isp cycle threshold + bucket creation cost [1]
