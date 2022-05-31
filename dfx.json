@@ -1,6 +1,6 @@
 {
     "canisters": {
-      "ISP":{
+      "isptest":{
         "main":"v1/ICSP.mo",
         "type":"motoko"
       }

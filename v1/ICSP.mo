@@ -51,7 +51,7 @@ shared(installer) actor class isp()  = this {
         var retiring = false;
     };
 
-    private var icsp_status_record = Buffer.Buffer<CanisterStatus>(100);
+    private var icsp_status_record = Buffer.Buffer<CanisterStatus>(500);
 
     // TODO : support http redirect get [3]
     public query({caller}) func get(key : Text) : async Result.Result<Principal, ()>{
@@ -256,7 +256,7 @@ shared(installer) actor class isp()  = this {
             headers = [
                 ("Content-Type", "text/html"),
                 ("Accept-Charset","utf8"),
-                ("Location", bucket_id # ".raw.ic0.app/" # key),
+                ("Location","http://" # bucket_id # ".raw.ic0.app/" # key),
                 ("Cache-Control", "max-age=3000") // 5 min
             ];
             body = Text.encodeUtf8("<html lang="#"en"#"><head><title>ICSP</title></head><body></body></html>");
