@@ -37,9 +37,12 @@
 * Support Programming: you can modify and delete data directly in the contract, and through the contract access restrictions, authorized access, to support more diverse forms of data distribution.
 
 # RoadMap
-- Q2 MVP Version Release : 0.01
-  - Support all features  above
-- Q3 Support HTTP Request and Response, Certificated Header
+- ~~Q2 MVP Version Release : 0.01~~ 
+- Q2 :
+  - Support HTTP Request and Response
+- Q3 : 
+  - Support Certificated Header
+  - Support Candid Types
 
 # Service Interface
 ## ICSP Canister
