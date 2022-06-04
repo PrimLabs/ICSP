@@ -41,7 +41,7 @@
 - Q2 :
   - Support HTTP Request and Response
 - Q3 : 
-  - Support Certificated Header
+  - Support Certified Http Header
   - Support Candid Types
 
 # Service Interface
