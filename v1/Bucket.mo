@@ -43,11 +43,11 @@ shared(installer) actor class Bucket() = this{
     };
 
     // build 200
-    public query func http_request(request : HttpRequest) : async HttpResponse{
+    public query func httpRequest(request : HttpRequest) : async HttpResponse{
         let path = Iter.toArray(Text.tokens(request.url, #text("/")));
         if (path.size() == 1) {
             switch(_get(path[0])) { 
-                case(#err(_err)) return errStaticPage();
+                case(#err(_err)) return _errStaticPage();
                 case(#ok(payload)) {
                     return {
                         status_code = 200;
@@ -58,7 +58,7 @@ shared(installer) actor class Bucket() = this{
                 }
             }
         };
-        errStaticPage()
+        _errStaticPage()
     };
 
     public shared({caller}) func store(args : StoreArgs) : async (){
@@ -66,7 +66,7 @@ shared(installer) actor class Bucket() = this{
         let _field = _getField(args.value.size(), args.file_type);
         assets.put(args.key, _field);
         _storageData(_field.0, args.value);
-        _wirteRecord("Bucket Store");
+        _wirteCanisterStatusRecord("Bucket Store");
     };
 
     // call back to isp canister
@@ -75,11 +75,15 @@ shared(installer) actor class Bucket() = this{
         if (Cycles.balance() < CYCLE_THRESHOLD) {
             let need : Nat = CYCLE_THRESHOLD - Cycles.balance() + 100_000_000_000; // threshold + 0.1 T
             ignore await ISP.topUpBucket(need);
-            _wirteRecord("Bucket Top Up");
+            _wirteCanisterStatusRecord("Bucket Top Up");
         };
     };
 
-    public shared func get_status_record() : async Text{
+    public shared func walletReceive() : async Nat{
+        Cycles.accept(Cycles.available())
+    };
+
+    public shared func getCanisterStatusRecord() : async Text{
         var res : Text = "";
         for (elem in bucket_status_record.vals()) {
             var time : Int = elem.time;
@@ -96,7 +100,20 @@ shared(installer) actor class Bucket() = this{
         return res;
     };
 
-    private func _wirteRecord(note : Text) {
+    public shared func getCanisterStatus() : async Text{
+        var res : Text = "";
+        var time : Int = Time.now();
+        res := res # " cycle_balance: " # Nat.toText(Cycles.balance());
+        res := res # " memory_size: " # Nat.toText(Prim.rts_memory_size());
+        res := res # " heap_size: " # Nat.toText(Prim.rts_heap_size());
+        res := res # " total_allocation: " # Nat.toText(Prim.rts_total_allocation());
+        res := res # " reclaimed: " # Nat.toText(Prim.rts_reclaimed());
+        res := res # " max_live_size: " # Nat.toText(Prim.rts_max_live_size());
+        res := res # " time: " # Int.toText(time);
+        return res;
+    };
+
+    private func _wirteCanisterStatusRecord(note : Text) {
         let record : CanisterStatus = {
             cycle_balance = Cycles.balance();
             memory_size = Prim.rts_memory_size();
@@ -110,7 +127,7 @@ shared(installer) actor class Bucket() = this{
         bucket_status_record.add(record);
     };
 
-    private func errStaticPage(): HttpResponse {
+    private func _errStaticPage(): HttpResponse {
         {
             status_code = 404;
             headers = [("Content-Type", "text/plain; version=0.0.4")];
@@ -153,10 +170,6 @@ shared(installer) actor class Bucket() = this{
             let growPage = new >> 16 + 1;
             ignore SM.grow(growPage);
         }
-    };
-
-    public shared func wallet_receive() : async Nat{
-        Cycles.accept(Cycles.available())
     };
 
     system func preupgrade() {
