@@ -1,7 +1,9 @@
 import Types "Lib/Types";
+import hash "mo:base/Hash";
 import Blob "mo:base/Blob";
 import Array "mo:base/Array";
 import Text "mo:base/Text";
+import Nat "mo:base/Nat";
 import Nat64 "mo:base/Nat64";
 import Result "mo:base/Result";
 import Principal "mo:base/Principal";
@@ -10,26 +12,22 @@ import Iter "mo:base/Iter";
 import Cycles "mo:base/ExperimentalCycles";
 import SM "mo:base/ExperimentalStableMemory";
 import HttpHandler "Lib/HttpHandler";
-
-import Nat "mo:base/Nat";
-import Int "mo:base/Int";
-import Buffer "mo:base/Buffer";
-import Time "mo:base/Time";
 import Prim "mo:⛔";
 
 shared(installer) actor class Bucket() = this{
+    private type Status                 = Types.Status;
     private type StoreArgs              = Types.StoreArgs;
     private type IspInterface           = Types.IspInterface;
     private type HttpRequest            = HttpHandler.HttpRequest;
     private type HttpResponse           = HttpHandler.HttpResponse;
-    private type CanisterStatus         = Types.CanisterStatus;
-    private let CYCLE_THRESHOLD         = 100_000_000_000; // 0.1 T
+    private let CYCLE_THRESHOLD         = 3_000_000_000_000;
     private let ISP : IspInterface      = actor (Principal.toText(installer.caller));
     private stable var offset           = 0;
     private stable var assets_entries : [var (Text, (Nat64, Nat, Text))] = [var];
+    private stable var logs_entries : [var (Nat, Status)] = [var];
+    private stable var log_index : Nat = 0;
     private var assets : TrieMap.TrieMap<Text, (Nat64, Nat, Text)> = TrieMap.fromEntries<Text, (Nat64, Nat, Text)>(assets_entries.vals(), Text.equal, Text.hash);
-    
-    private var bucket_status_record = Buffer.Buffer<CanisterStatus>(100);
+    private var logs : TrieMap.TrieMap<Nat, Status> = TrieMap.fromEntries<Nat, Status>(logs_entries.vals(), Nat.equal, hash.hash);
 
     public query({caller}) func get(key : Text) : async Result.Result<(Blob, Text), ()> {
         switch(assets.get(key)) {
@@ -43,11 +41,11 @@ shared(installer) actor class Bucket() = this{
     };
 
     // build 200
-    public query func httpRequest(request : HttpRequest) : async HttpResponse{
+    public query func http_request(request : HttpRequest) : async HttpResponse{
         let path = Iter.toArray(Text.tokens(request.url, #text("/")));
         if (path.size() == 1) {
             switch(_get(path[0])) { 
-                case(#err(_err)) return _errStaticPage();
+                case(#err(_err)) return errStaticPage();
                 case(#ok(payload)) {
                     return {
                         status_code = 200;
@@ -58,76 +56,66 @@ shared(installer) actor class Bucket() = this{
                 }
             }
         };
-        _errStaticPage()
+        errStaticPage()
+    };
+    
+    public query func get_log_last_index() : async Nat{
+        log_index
+    };
+
+    public query func get_status(index : Nat) : async Status{
+        switch(logs.get(index)) {
+            case (null) {
+                let status : Status = {
+                    key = "";
+                    rts_memory_size = debug_show(Prim.rts_memory_size());
+                    rts_heap_size = debug_show(Prim.rts_heap_size());
+                    rts_total_allocation = debug_show(Prim.rts_total_allocation());
+                    rts_reclaimed = debug_show(Prim.rts_reclaimed());
+                    rts_max_live_size = debug_show(Prim.rts_max_live_size());
+                    rts_callback_table_count = debug_show(Prim.rts_callback_table_count());
+                    rts_callback_table_size = debug_show(Prim.rts_callback_table_size());
+                    stable_memory_size = debug_show(offset);
+                };
+                status
+            };
+            case (?status) { status };
+        }
     };
 
     public shared({caller}) func store(args : StoreArgs) : async (){
-        assert(caller == Principal.fromActor(ISP));
         let _field = _getField(args.value.size(), args.file_type);
         assets.put(args.key, _field);
         _storageData(_field.0, args.value);
-        _wirteCanisterStatusRecord("Bucket Store");
-    };
-
-    // call back to isp canister
-    public shared({caller}) func monitor() : async (){
-        if (caller != Principal.fromActor(ISP)) return;
         if (Cycles.balance() < CYCLE_THRESHOLD) {
-            let need : Nat = CYCLE_THRESHOLD - Cycles.balance() + 100_000_000_000; // threshold + 0.1 T
-            ignore await ISP.topUpBucket(need);
-            _wirteCanisterStatusRecord("Bucket Top Up");
+            let need : Nat = CYCLE_THRESHOLD - Cycles.balance() + 1_000_000_000_000; // threshold + 1 T
+            ignore ISP.topUpBucket(need);
         };
-    };
-
-    public shared func walletReceive() : async Nat{
-        Cycles.accept(Cycles.available())
-    };
-
-    public shared func getCanisterStatusRecord() : async Text{
-        var res : Text = "";
-        for (elem in bucket_status_record.vals()) {
-            var time : Int = elem.time;
-            res := res # " cycle_balance: " # Nat.toText(elem.cycle_balance);
-            res := res # " memory_size: " # Nat.toText(elem.memory_size);
-            res := res # " heap_size: " # Nat.toText(elem.heap_size);
-            res := res # " total_allocation: " # Nat.toText(elem.total_allocation);
-            res := res # " reclaimed: " # Nat.toText(elem.reclaimed);
-            res := res # " max_live_size: " # Nat.toText(elem.max_live_size);
-            res := res # " time: " # Int.toText(time);
-            res := res # " note: " # elem.note;
-            res := res # " xxxx ";
+        let status : Status = {
+            key = args.key;
+            rts_memory_size = debug_show(Prim.rts_memory_size());
+            rts_heap_size = debug_show(Prim.rts_heap_size());
+            rts_total_allocation = debug_show(Prim.rts_total_allocation());
+            rts_reclaimed = debug_show(Prim.rts_reclaimed());
+            rts_max_live_size = debug_show(Prim.rts_max_live_size());
+            rts_callback_table_count = debug_show(Prim.rts_callback_table_count());
+            rts_callback_table_size = debug_show(Prim.rts_callback_table_size());
+            stable_memory_size = debug_show(offset);
         };
-        return res;
+        logs.put(log_index, status);
+        log_index += 1;
     };
 
-    public shared func getCanisterStatus() : async Text{
-        var res : Text = "";
-        var time : Int = Time.now();
-        res := res # " cycle_balance: " # Nat.toText(Cycles.balance());
-        res := res # " memory_size: " # Nat.toText(Prim.rts_memory_size());
-        res := res # " heap_size: " # Nat.toText(Prim.rts_heap_size());
-        res := res # " total_allocation: " # Nat.toText(Prim.rts_total_allocation());
-        res := res # " reclaimed: " # Nat.toText(Prim.rts_reclaimed());
-        res := res # " max_live_size: " # Nat.toText(Prim.rts_max_live_size());
-        res := res # " time: " # Int.toText(time);
-        return res;
-    };
+    // // call back to isp canister
+    // public shared({caller}) func monitor() : async (){
+    //     if (caller != Principal.fromActor(ISP)) return;
+    //     if (Cycles.balance() < CYCLE_THRESHOLD) {
+    //         let need : Nat = CYCLE_THRESHOLD - Cycles.balance() + 1_000_000_000_000; // threshold + 1 T
+    //         ignore ISP.topUpBucket(need);
+    //     };
+    // };
 
-    private func _wirteCanisterStatusRecord(note : Text) {
-        let record : CanisterStatus = {
-            cycle_balance = Cycles.balance();
-            memory_size = Prim.rts_memory_size();
-            heap_size = Prim.rts_heap_size();
-            total_allocation = Prim.rts_total_allocation();
-            reclaimed = Prim.rts_reclaimed();
-            max_live_size = Prim.rts_max_live_size();
-            time = Time.now();
-            note = note;
-        };
-        bucket_status_record.add(record);
-    };
-
-    private func _errStaticPage(): HttpResponse {
+    private func errStaticPage(): HttpResponse {
         {
             status_code = 404;
             headers = [("Content-Type", "text/plain; version=0.0.4")];
@@ -172,6 +160,10 @@ shared(installer) actor class Bucket() = this{
         }
     };
 
+    public shared func wallet_receive() : async Nat{
+        Cycles.accept(Cycles.available())
+    };
+
     system func preupgrade() {
         assets_entries := Array.init<(Text, (Nat64, Nat, Text))>(assets.size(), ("", (0, 0, "")));
         var assets_index = 0;
@@ -179,9 +171,28 @@ shared(installer) actor class Bucket() = this{
             assets_entries[assets_index] := a;
             assets_index += 1;
         };
+
+        let status : Status = {
+            key = "";
+            rts_memory_size = debug_show(Prim.rts_memory_size());
+            rts_heap_size = debug_show(Prim.rts_heap_size());
+            rts_total_allocation = debug_show(Prim.rts_total_allocation());
+            rts_reclaimed = debug_show(Prim.rts_reclaimed());
+            rts_max_live_size = debug_show(Prim.rts_max_live_size());
+            rts_callback_table_count = debug_show(Prim.rts_callback_table_count());
+            rts_callback_table_size = debug_show(Prim.rts_callback_table_size());
+            stable_memory_size = debug_show(SM.size() * 65536);
+        };
+        logs_entries := Array.init<(Nat, Status)>(logs.size(), (0, status));
+        var logs_index = 0;
+        for (l in logs.entries()) {
+            logs_entries[logs_index] := l;
+            logs_index += 1;
+        };
     };
 
     system func postupgrade() {
         assets_entries := [var];
+        logs_entries := [var];
     };
 };

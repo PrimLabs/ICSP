@@ -14,7 +14,7 @@ import Nat64 "mo:base/Nat64";
 import HttpHandler "Lib/HttpHandler";
 import A "Lib/Account";
 import U "Lib/Utils";
-
+import SM "mo:base/ExperimentalStableMemory";
 import Nat "mo:base/Nat";
 import Int "mo:base/Int";
 import Buffer "mo:base/Buffer";
@@ -22,6 +22,7 @@ import Time "mo:base/Time";
 import Prim "mo:⛔";
 
 shared(installer) actor class isp()  = this {
+    private type Status              = Types.Status;
     private type StoreArgs           = Types.StoreArgs;
     private type BucketInterface     = Types.BucketInterface;
     private type LiveBucket          = Types.LiveBucket;
@@ -31,10 +32,11 @@ shared(installer) actor class isp()  = this {
     private type CanisterStatus      = Types.CanisterStatus;
     private type HttpRequest         = HttpHandler.HttpRequest;
     private type HttpResponse        = HttpHandler.HttpResponse;
-    private let RETIRING_THRESHOLD   = 10485760; // 10 MB
-    private let CYCLE_SHARE          =   300_000_000_000;  // cycle share each bucket created
-    private let CYCLE_BUCKET_LEFT    =   100_000_000_000;
-    private let CYCLE_THRESHOLD      = 2_000_000_000_000; //  658_368_000_000 Cycle :  2G / Month
+    private let RETIRING_THRESHOLD   = 6979321856; // 6.5 G 6979321856
+    private let CYCLE_SHARE          = 14_000_000_000_000;  // cycle share each bucket created
+    private let CYCLE_BUCKET_LEFT    = 1_000_000_000_000;
+                                    // 90_000_000_000_000
+    private let CYCLE_THRESHOLD      = 16_000_000_000_000; //  658368000000 Cycle :  2G / Month
     private let CYCLE_MINTING_CANISTER = Principal.fromText("rkp4c-7iaaa-aaaaa-aaaca-cai");
     private let Ledger : LEDGER = actor("ryjl3-tyaaa-aaaaa-aaaba-cai");
     private let TOP_UP_CANISTER_MEMO = 0x50555054 : Nat64;
@@ -63,8 +65,11 @@ shared(installer) actor class isp()  = this {
         return #err(())
     };
 
+    public query({caller}) func getBucketId() : async Principal {
+        Principal.fromActor(liveBucket.bucket)
+    };
+
     public query({caller}) func getBuckets() : async (LiveBucketExt, [Principal]){
-        assert(caller == ADMIN);
         let res = Array.init<Principal>(buckets.size(), Principal.fromActor(this));
         var index = 0;
         for(p in buckets.keys()){
@@ -81,7 +86,7 @@ shared(installer) actor class isp()  = this {
         )
     };
 
-    public query func httpRequest(request : HttpRequest) : async HttpResponse{
+    public query func http_request(request : HttpRequest) : async HttpResponse{
         let path = Iter.toArray(Text.tokens(request.url, #text("/")));
         if (path.size() == 1) {
             for((p, keys) in buckets.entries()){
@@ -91,6 +96,20 @@ shared(installer) actor class isp()  = this {
             };
         };
         errStaticPage()
+    };
+
+    public query func get_status() : async Status{
+        {
+            key = "";
+            rts_memory_size = debug_show(Prim.rts_memory_size());
+            rts_heap_size = debug_show(Prim.rts_heap_size());
+            rts_total_allocation = debug_show(Prim.rts_total_allocation());
+            rts_reclaimed = debug_show(Prim.rts_reclaimed());
+            rts_max_live_size = debug_show(Prim.rts_max_live_size());
+            rts_callback_table_count = debug_show(Prim.rts_callback_table_count());
+            rts_callback_table_size = debug_show(Prim.rts_callback_table_size());
+            stable_memory_size = debug_show(SM.size() * 65536);
+        }
     };
 
     public shared({caller}) func init() : async Text{
@@ -126,7 +145,7 @@ shared(installer) actor class isp()  = this {
 
     // inspect cycle balance [1]
     public shared({caller}) func createNewBucket() : async (){
-        if (caller != Principal.fromActor(this) and caller != ADMIN) return;
+        // if (caller != Principal.fromActor(this) and caller != ADMIN) return;
         Cycles.add(CYCLE_SHARE);
         let nb = await Bucket.Bucket();
         liveBucket.bucket := nb : BucketInterface;
@@ -135,7 +154,7 @@ shared(installer) actor class isp()  = this {
     };
 
     public shared({caller}) func topUp(amount : Nat) : async Result.Result<Text, Text> {
-        if (caller != Principal.fromActor(this) or not isBucket(caller)) return #err("PermissionDenied");
+        // if (caller != Principal.fromActor(this) or not isBucket(caller)) return #err("PermissionDenied");
         let default = Blob.fromArrayMut(Array.init<Nat8>(32, 0:Nat8));
         let subaccount = Blob.fromArray(U.principalToSubAccount(Principal.fromActor(this)));
         let cycle_ai = A.accountIdentifier(CYCLE_MINTING_CANISTER, subaccount);

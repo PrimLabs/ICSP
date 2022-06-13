@@ -1,6 +1,9 @@
 import Result "mo:base/Result";
+import HttpHandler "HttpHandler";
 
 module {
+    type HttpRequest    = HttpHandler.HttpRequest;
+    type HttpResponse   = HttpHandler.HttpResponse;
 
     // file type : jpeg , jpg : Text
     public type StoreArgs = {
@@ -9,9 +12,25 @@ module {
         file_type : Text;
     };
 
+    public type Status = {
+        key : Text;
+        rts_memory_size: Text;
+        rts_heap_size: Text;
+        rts_total_allocation: Text;
+        rts_reclaimed: Text;
+        rts_max_live_size: Text;
+        rts_callback_table_count: Text;
+        rts_callback_table_size: Text;
+        stable_memory_size: Text
+    };
+
     public type BucketInterface = actor{
+        get : query (key : Text) -> async Result.Result<(Blob, Text), ()>;
+        get_status : query (index : Nat) -> async Status;
+        http_request : query (request : HttpRequest) -> async HttpResponse;
+        wallet_receive : () -> async Nat;
         store : (args : StoreArgs) -> async ();
-        monitor : () -> async ();
+        get_log_last_index :  query () -> async Nat;
     };
 
     public type IspInterface = actor{
